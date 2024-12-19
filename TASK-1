@@ -1,0 +1,109 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyNyCZ3dYMzCzE5SxDxf01cI"
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 383
+        },
+        "id": "nYpkaRLF9TLo",
+        "outputId": "573a68a9-9511-4e28-d9c9-76f5fbbc334e"
+      },
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "ModuleNotFoundError",
+          "evalue": "No module named 'PyPDF2'",
+          "traceback": [
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+            "\u001b[0;31mModuleNotFoundError\u001b[0m                       Traceback (most recent call last)",
+            "\u001b[0;32m<ipython-input-1-d9d20ed44823>\u001b[0m in \u001b[0;36m<cell line: 2>\u001b[0;34m()\u001b[0m\n\u001b[1;32m      1\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0mrequests\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 2\u001b[0;31m \u001b[0;32mimport\u001b[0m \u001b[0mPyPDF2\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      3\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0mnumpy\u001b[0m \u001b[0;32mas\u001b[0m \u001b[0mnp\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      4\u001b[0m \u001b[0;32mfrom\u001b[0m \u001b[0mio\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0mBytesIO\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      5\u001b[0m \u001b[0;32mfrom\u001b[0m \u001b[0msentence_transformers\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0mSentenceTransformer\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+            "\u001b[0;31mModuleNotFoundError\u001b[0m: No module named 'PyPDF2'",
+            "",
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0;32m\nNOTE: If your import is failing due to a missing package, you can\nmanually install dependencies using either !pip or !apt.\n\nTo view examples of installing some common dependencies, click the\n\"Open Examples\" button below.\n\u001b[0;31m---------------------------------------------------------------------------\u001b[0m\n"
+          ],
+          "errorDetails": {
+            "actions": [
+              {
+                "action": "open_url",
+                "actionText": "Open Examples",
+                "url": "/notebooks/snippets/importing_libraries.ipynb"
+              }
+            ]
+          }
+        }
+      ],
+      "source": [
+        "import requests\n",
+        "import PyPDF2\n",
+        "import numpy as np\n",
+        "from io import BytesIO\n",
+        "from sentence_transformers import SentenceTransformer\n",
+        "import faiss\n",
+        "def download_pdf_from_url(url):\n",
+        "    response = requests.get(url)\n",
+        "    if response.status_code == 200:\n",
+        "        return BytesIO(response.content)  # Return PDF as in-memory file\n",
+        "    else:\n",
+        "        raise Exception(f\"Failed to download PDF. HTTP Status Code: {response.status_code}\")\n",
+        "def extract_text_from_pdf(pdf_file):\n",
+        "    text = \"\"\n",
+        "    reader = PyPDF2.PdfReader(pdf_file)\n",
+        "    for page in reader.pages:\n",
+        "        page_text = page.extract_text()\n",
+        "        if page_text:  # Only append if text exists\n",
+        "            text += page_text + \"\\n\"\n",
+        "    return text\n",
+        "def chunk_text(text, chunk_size=512):\n",
+        "    return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]\n",
+        "def embed_chunks(chunks):\n",
+        "    model = SentenceTransformer('all-MiniLM-L6-v2')\n",
+        "    embeddings = model.encode(chunks, convert_to_tensor=False)  # Get embeddings as a NumPy array\n",
+        "    return np.array(embeddings)\n",
+        "def store_embeddings(embeddings):\n",
+        "    dimension = embeddings.shape[1]  # Embedding dimension\n",
+        "    index = faiss.IndexFlatL2(dimension)  # L2 Distance-based index\n",
+        "    index.add(embeddings)  # Add embeddings to the index\n",
+        "    return index\n",
+        "def main():\n",
+        "    pdf_url = \"https://www.hunter.cuny.edu/dolciani/pdf_files/workshop-materials/mmc-presentations/tables-charts-and-graphs-with-examples-from.pdf/at_download/file\"\n",
+        "    try:\n",
+        "        pdf_file = download_pdf_from_url(pdf_url)\n",
+        "        print(\"PDF downloaded successfully.\")\n",
+        "        text = extract_text_from_pdf(pdf_file)\n",
+        "        print(\"Text extracted successfully.\")\n",
+        "        chunks = chunk_text(text)\n",
+        "        print(f\"Text chunked into {len(chunks)} parts.\")\n",
+        "        embeddings = embed_chunks(chunks)\n",
+        "        print(f\"Generated embeddings with shape: {embeddings.shape}\")\n",
+        "        index = store_embeddings(embeddings)\n",
+        "        print(\"Embeddings stored successfully in FAISS index.\")\n",
+        "        print(\"Querying the FAISS index with the first embedding...\")\n",
+        "        distances, indices = index.search(embeddings[:1], k=3)  # Find 3 nearest neighbors\n",
+        "        print(\"Nearest neighbors:\", indices)\n",
+        "        print(\"Distances:\", distances)\n",
+        "    except Exception as e:\n",
+        "        print(f\"An error occurred: {e}\")\n",
+        "if __name__ == \"__main__\":\n",
+        "    main()\n"
+      ]
+    }
+  ]
+}
